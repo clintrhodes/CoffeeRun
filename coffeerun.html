@@ -1,0 +1,100 @@
+<html><head><link href='http://fonts.googleapis.com/css?family=Press+Start+2P' rel='stylesheet' type='text/css'>
+<style>
+body { background-color: black; color: white; font-family: 'Press Start 2P', cursive; position: absolute;} .game-container { padding: 20px; background-color: black; } td { width: 50px; height: 50px; text-align: center;} 
+.game-grid .column { width: 260px; margin: 10px; text-align: center; }
+.column { float: left; } .game-info-border { background-color: 0066ff; border-width: 15px; -webkit-border-image:url(background.gif) 30 repeat stretch; -moz-border-image:url(background.gif) 30 repeat stretch; border-image:url(background.gif) 30 repeat stretch; }
+#intro { width: 600px; text-align: center;}
+</style>
+</head> <body> <div id="intro" class="game-info-border"><img src="coffeerun.png"><p> The People Media developers need coffee or they may not make their deadline!<p>Use the keyboard arrow keys to guide Coffee Intern Kevin to deliver coffee to wake up the devs!<p><a href=# onclick="javascript:startGame(0);">Click To Start</a></div> <div id="gameSurface" style="display:none;"><div id="gameInfo" class="game-grid">    <div id="gameTimer" class="column game-info-border">Game Over</div> <div id="gameLevel" class="column game-info-border"></div> </div> <p> <div id="gameDiv" class="game-container">&nbsp;</div> </div> </body>
+<script>
+    var gameModel; var gameTimer; var gameScore; var defaultGameDuration = 90; 
+    var boardLayouts = ['#######\r\n#.    #\r\n#$  # #\r\n#.  $ #\r\n# .$  #\r\n#@    #\r\n#######', '   ###\r\n  ## # ####\r\n ##  ###  #\r\n## $      #\r\n#   @$    #\r\n### $###  #\r\n  #  #..  #\r\n ## ##.# ##\r\n #      ##\r\n #     ##\r\n #######', '######    \r\n#@   ##   \r\n# ##$ ####\r\n# # $ *  #\r\n# $ ..*  #\r\n#####..$ #\r\n    ##.$ #\r\n     #####', '   #####\r\n  ##   #\r\n  #    #\r\n### $###\r\n#.*.* # \r\n## *  # \r\n #  $ # \r\n ###@## \r\n   ###  ', '    ####    \r\n   ##  ###  \r\n  ## $.  #  \r\n### .** $###\r\n# $ ....   #\r\n#@$### # # #\r\n##    $  $ #\r\n #####   ###\r\n     #####  ']
+    function startGame(layoutLevel) {
+        if (gameModel == null || gameModel.active == false) {
+            document.getElementById("intro").style.display = 'none'; document.getElementById("gameSurface").style.display = 'inline'; 
+            gameModel = generateGameModel(boardLayouts[layoutLevel], layoutLevel, defaultGameDuration, moveCompleted);
+            gameModel.container = document.getElementById("gameDiv");
+            gameModel.container.replaceChild(generateGameBoard(gameModel), gameModel.container.firstChild);
+            document.getElementById("gameLevel").innerHTML = "Level " + gameModel.level;
+            gameModel.start();
+            gameTimer = setInterval(gameTimerChanged, 1000); 
+        }
+    }
+    function stopGame(message) { gameModel.stop(); clearInterval(gameTimer); alert(message); }
+    function generateGameModel(boardLayout, layoutLevel, gameDuration, modelChangedCallback) {
+        var model = {
+            player: null, level: (layoutLevel + 1), active: false, devs: {}, mugs: {}, walls: {}, dimensions: [0, 0], timer: gameDuration,
+            start: function() { this.active = true; }, stop: function() { this.active = false; },
+            moveLeft: function() { return this.active ? this.move(0, -1) : false; }, moveRight: function() { return this.active ? this.move(0, 1) : false; },
+            moveDown: function() { return this.active ? this.move(1, 0) : false; }, moveUp: function() { return this.active ? this.move(-1, 0) : false; },
+            move: function(x, y) {
+                var playerMove = (this.player[0] + x) + '-' + (this.player[1] + y);
+                var projectedMove = (this.player[0] + (x*2)) + '-' + (this.player[1] + (y*2));
+                if (this.walls[playerMove]) return;
+                else if (this.mugs[playerMove])  {
+                    if (this.walls[projectedMove] || this.mugs[projectedMove]) { return; } 
+                    delete this.mugs[playerMove]; this.mugs[projectedMove] = 1; 
+                } 
+                this.player = [this.player[0] += x, this.player[1] += y]; modelChangedCallback();
+            },
+            isLayoutCompleted: function() {
+                for (var i in this.devs) { if (!this.mugs[i]) return false; }
+                this.stop(); return true;
+            }
+        };
+        var lines = boardLayout.split('\r\n'); model.dimensions[0] = lines.length;
+        for (var rowNum = 0, len = lines.length; rowNum < len; rowNum++) {
+            model.dimensions[1] = lines[rowNum].length > model.dimensions[1] ? lines[rowNum].length : model.dimensions[1];
+            for (var colNum = 0, rowLen = lines[rowNum].length; colNum < rowLen; colNum++) {
+                var key = rowNum + '-' + colNum;
+                switch (lines[rowNum].substring(colNum, colNum + 1)) {
+                    case '.': model.devs[key] = 1; break; case '$': model.mugs[key] = 1; break; case '#': model.walls[key] = 1; break; 
+                    case '@': model.player = [rowNum, colNum]; break; case '*': model.mugs[key] = 1; model.devs[key] = 1; break; 
+                    case '+': model.devs[key] = 1; model.player = [rowNum, colNum]; break; default: break;
+                }
+            }
+        } return model;
+    };
+    function generateGameBoard(model) {
+        var table = document.createElement('table');
+        for (var rowNum = 0; rowNum < model.dimensions[0]; rowNum++) {
+            var tableRow = table.insertRow(rowNum);
+            for (var colNum = 0; colNum < model.dimensions[1]; colNum++) {
+                var tableCell = tableRow.insertCell(colNum);
+                var key = rowNum + '-' + colNum;
+                if (model.walls[key]) { tableCell.innerHTML = '<img src="block.jpg">'; }
+                else if (model.devs[key]) {
+                    if (model.mugs[key]) { tableCell.innerHTML = '<img src="awake_dev.gif">' }
+                    else if (model.player[0] == rowNum && model.player[1] == colNum) { tableCell.innerHTML = '<img src="kevin.gif">' }
+                    else { tableCell.innerHTML = '<img src="sleepy_dev.gif">' }
+                }
+                else if (model.mugs[key]) { tableCell.innerHTML = '<img src="cup.gif">' }
+                else if (model.player[0] == rowNum && model.player[1] == colNum) { tableCell.innerHTML = '<img src="kevin.gif">' };
+            }
+        }
+        return table;
+    };
+    function moveCompleted() {
+        gameModel.container.replaceChild(generateGameBoard(gameModel), gameModel.container.firstChild)
+        if (gameModel.isLayoutCompleted()) {
+            stopGame('Great job! Now for something a bit harder...');
+            if ((gameModel.level - 1) <= boardLayouts.length) { startGame(gameModel.level); } 
+            else { alert('You have delivered coffee to all the developers!  Things are looking up for the job prospects of Kevin the Coffee Intern!'); }
+        }        
+    }    
+    function gameTimerChanged() {
+      gameModel.timer = gameModel.timer - 1;
+      document.getElementById("gameTimer").innerHTML = "Time " + ("000" + gameModel.timer).slice(-3);
+      if (gameModel.timer <= 0 && gameModel.active) {
+         stopGame('Game Over!');
+         document.getElementById("gameLevel").innerHTML = '<a href=# onclick="javascript:startGame(0);">Click To Replay</a>';
+      }
+    }
+    window.onkeyup = function(e) {
+        switch(e.key || e.keyCode) {
+            case 37: gameModel.moveLeft(); return false; case 38: gameModel.moveUp(); return false; 
+            case 39: gameModel.moveRight(); return false; case 40: gameModel.moveDown(); return false;
+        } 
+    };
+</script>
+</html>
