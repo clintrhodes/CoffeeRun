@@ -1,5 +1,4 @@
 #CoffeeRun
-=========
 
 Part of the interview process at my current employeer involved a "100 line challenge".  The task was to make something fun or cool in 100 lines or less.  
 
